@@ -1,0 +1,162 @@
+import numpy as np
+import random
+import matplotlib.pyplot as plt
+
+# ----------------------------------------------------
+# Payoff matrix (0 = C, 1 = D)
+# ----------------------------------------------------
+
+payoff = {
+    0: {0: 3, 1: 0},
+    1: {0: 5, 1: 1}
+}
+
+# ----------------------------------------------------
+# Strategies
+# ----------------------------------------------------
+
+
+def cooperate(hs, ho):
+    return 0
+
+
+def defect(hs, ho):
+    return 1
+
+
+def tit_for_tat(hs, ho):
+    return 0 if len(ho) == 0 else ho[-1]
+
+
+def random_strategy(hs, ho):
+    return random.choice([0, 1])
+
+
+strategies = {
+    "Cooperate": cooperate,
+    "Defect": defect,
+    "TitForTat": tit_for_tat,
+    "Random": random_strategy
+}
+
+
+# ----------------------------------------------------
+# Repeated game
+# ----------------------------------------------------
+
+def play_repeated(A, B, rounds=50):
+    hA, hB = [], []
+    sA = sB = 0
+
+    for _ in range(rounds):
+        a = A(hA, hB)
+        b = B(hB, hA)
+        hA.append(a)
+        hB.append(b)
+        sA += payoff[a][b]
+        sB += payoff[b][a]
+    return sA, sB
+
+# ----------------------------------------------------
+# Round-robin tournament
+# ----------------------------------------------------
+
+
+def run_tournament(rounds=50):
+    names = list(strategies.keys())
+    scores = {n: 0 for n in names}
+
+    for A in names:
+        for B in names:
+            sA, sB = play_repeated(strategies[A], strategies[B], rounds)
+            scores[A] += sA
+            scores[B] += sB
+
+    return scores
+
+# ----------------------------------------------------
+# Plot tournament results
+# ----------------------------------------------------
+
+
+def plot_scores(scores):
+    plt.bar(scores.keys(), scores.values())
+    plt.ylabel("Total Score")
+    plt.title("Tournament")
+    plt.show()
+
+# ----------------------------------------------------
+# Replicator dynamics
+# ----------------------------------------------------
+
+
+def fitness(name, freqs):
+    f = 0
+    for other, p in freqs.items():
+        s, _ = play_repeated(strategies[name], strategies[other], rounds=20)
+        f += p * s
+    return f
+
+
+def replicator_step(freqs):
+    fits = {s: fitness(s, freqs) for s in freqs}
+    avg = sum(freqs[s] * fits[s] for s in freqs)
+    return {s: freqs[s] * (fits[s] / avg) for s in freqs}
+
+
+def run_replicator(gens=100):
+    f = {"Cooperate": 0.33, "Defect": 0.33, "TitForTat": 0.34}
+    history = []
+
+    for _ in range(gens):
+        history.append(f.copy())
+        f = replicator_step(f)
+    return history
+
+
+def plot_replicator(history):
+    plt.plot([h["Cooperate"] for h in history], label="Cooperate")
+    plt.plot([h["Defect"] for h in history], label="Defect")
+    plt.plot([h["TitForTat"] for h in history], label="TitForTat")
+    plt.xlabel("Generation")
+    plt.ylabel("Frequency")
+    plt.title("Replicator Dynamics")
+    plt.legend()
+    plt.show()
+
+
+# ----------------------------------------------------
+# Bifurcation diagram (vary temptation T)
+# ----------------------------------------------------
+
+def bifurcation(T_values):
+    steady = []
+
+    for T in T_values:
+        payoff[1][0] = T
+        f = {"Cooperate": 0.33, "Defect": 0.33, "TitForTat": 0.34}
+        for _ in range(200):
+            f = replicator_step(f)
+        steady.append(f["Defect"])
+
+    plt.plot(T_values, steady, ".")
+    plt.xlabel("Temptation T")
+    plt.ylabel("Defection (steady state)")
+    plt.title("Bifurcation (long-term defect freq)")
+    plt.show()
+
+
+# ----------------------------------------------------
+# Main
+# ----------------------------------------------------
+
+if __name__ == "__main__":
+    scores = run_tournament()
+    print(scores)
+    plot_scores(scores)
+
+    hist = run_replicator()
+    plot_replicator(hist)
+
+    T_vals = np.linspace(1.1, 6.0, 80)
+    bifurcation(T_vals)
